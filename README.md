@@ -65,6 +65,11 @@ tell you when what you need to install. You can run the bootstrap with:
 
 and follow instructions from the script. You can then ignore the rest of the build documentation.
 
+If building of the help files fails with an unknown locale error, set your locale environment:
+
+    $ export LC_ALL=en_US.UTF-8
+    $ export LANG=en_US.UTF-8
+
 ## Prerequisites installation
 
 Prerequisites are installed through `pip`. However, some of them are not "pip installable" and have
