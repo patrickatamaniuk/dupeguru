@@ -14,6 +14,8 @@ http://www.gnu.org/licenses/gpl-3.0.html
 #import "Consts.h"
 #import "DetailsPanel_UI.h"
 
+#define THUMBNAIL_MAX_SIZE 1024
+
 @implementation DetailsPanel
 
 @synthesize dupeImage;
@@ -39,7 +41,7 @@ http://www.gnu.org/licenses/gpl-3.0.html
 {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     NSImage *image = [[NSImage alloc] initByReferencingFile:imagePath];
-    NSImage *thumbnail = [image imageByScalingProportionallyToSize:NSMakeSize(512,512)];
+    NSImage *thumbnail = [image imageByScalingProportionallyToSize:NSMakeSize(THUMBNAIL_MAX_SIZE,THUMBNAIL_MAX_SIZE)];
     [image release];
     NSMutableDictionary *params = [NSMutableDictionary dictionary];
     [params setValue:imagePath forKey:@"imagePath"];
