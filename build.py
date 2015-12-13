@@ -22,7 +22,7 @@ from hscommon.build import (
     add_to_pythonpath, print_and_do, copy_packages, filereplace,
     get_module_version, move_all, copy_all, OSXAppStructure,
     build_cocoalib_xibless, fix_qt_resource_file, build_cocoa_ext, copy_embeddable_python_dylib,
-    collect_stdlib_dependencies, copy
+    collect_stdlib_dependencies, copy, symlink
 )
 from hscommon import loc
 from hscommon.plat import ISOSX, ISLINUX
@@ -139,6 +139,22 @@ def build_cocoa(edition, dev):
         'core', 'hscommon', 'cocoa/inter', 'cocoalib/cocoa', 'objp', 'send2trash'
     ] + specific_packages
     copy_packages(tocopy, pydep_folder, create_links=dev)
+    print("Creating cli structure")
+    pydep_folder = op.join(app.resources, 'py')
+    if not op.exists(pydep_folder):
+        os.mkdir(pydep_folder)
+    tocopy = [
+        'clilib/cli',
+    ]
+    copy_packages(tocopy, pydep_folder, create_links=dev)
+
+    filedest = os.path.join(pydep_folder, 'dupeGuruCli')
+    if dev:
+        symlink(os.path.abspath('cli/dupeGuruCli'), filedest)
+    else:
+        copy('cli/dupeGuruCli', filedest)
+        os.chmod(filedest, 0o755)
+
     sys.path.insert(0, 'build')
     extra_deps = None
     if edition == 'pe':
@@ -170,6 +186,9 @@ def build_cocoa(edition, dev):
     tmpl = open('cocoa/run_template.py', 'rt').read()
     run_contents = tmpl.replace('{{app_path}}', app.dest)
     open('run.py', 'wt').write(run_contents)
+    print("Creating the cli wrapper")
+    open('dupeGuruCli', 'wt').write("#!/bin/sh\npython3 '%s' \"$@\"" % os.path.join(app.dest, 'Contents/Resources/py/dupeGuruCli'))
+    os.chmod('dupeGuruCli', 0o755)
 
 def build_qt(edition, dev, conf):
     print("Building localizations")

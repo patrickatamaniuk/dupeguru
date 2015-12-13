@@ -17,6 +17,7 @@ env
 cocoa/autogen
 
 /run.py
+/dupeGuruCli
 /conf.json
 /cocoa/*/Info.plist
 /cocoa/*/build
