@@ -12,10 +12,21 @@ def main():
     parser = ArgumentParser()
     parser.add_argument("-v", "--verbosity", action="count",
                     help="increase output verbosity")
+    parser.add_argument("--load", help="Load results")
+    parser.add_argument("--export", help="Export results")
+    parser.add_argument("-o", "--outfile", help="Destination file", default=None)
     args = parser.parse_args()
-    print(args)
+    print(args.export)
 
-    model = DupeGuru(DupeGuruView())
+    model = DupeGuru(DupeGuruView(args=args))
+
+    if args.load:
+        model.load_from(args.load)
+
+    if args.export == 'csv':
+        model.export_to_csv()
+    elif args.export == 'xhtml':
+        model.export_to_xhtml()
     print(model)
 
 if __name__ == '__main__':

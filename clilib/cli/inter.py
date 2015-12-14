@@ -4,8 +4,9 @@ from hscommon.jobprogress.job import nulljob, JobCancelled
 class DupeGuruView:
     JOB = nulljob
 
-    def __init__(self):
+    def __init__(self, args=None):
         self.messages = []
+        self.args = args
 
     def start_job(self, jobid, func, args=()):
         try:
@@ -21,6 +22,11 @@ class DupeGuruView:
 
     def show_message(self, msg):
         self.messages.append(msg)
+        print(msg)
 
     def ask_yes_no(self, prompt):
         return True # always answer yes
+
+    def select_dest_file(self, msg, output_format):
+        print(msg, output_format)
+        return self.args.outfile or 'tmp.file'
