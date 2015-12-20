@@ -49,8 +49,8 @@ class PyDupeGuruBase(PyBaseApp):
         self.model.add_directory(directory)
     
     #---Results
-    def doScan(self):
-        self.model.start_scanning()
+    def doScan_(self, rescan: bool):
+        self.model.start_scanning(rescan=rescan)
     
     def exportToXHTML(self):
         self.model.export_to_xhtml()
@@ -125,6 +125,9 @@ class PyDupeGuruBase(PyBaseApp):
     #---Information
     def resultsAreModified(self) -> bool:
         return self.model.results.is_modified
+
+    def hasResults(self) -> bool:
+        return len(self.model.results.scanbase) > 0
     
     #---Properties
     def setMixFileKind_(self, mix_file_kind: bool):

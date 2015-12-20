@@ -265,12 +265,17 @@ http://www.gnu.org/licenses/gpl-3.0.html
 
 - (void)startDuplicateScan
 {
+    BOOL keep = true;
     if ([model resultsAreModified]) {
         if ([Dialogs askYesNo:NSLocalizedString(@"You have unsaved results, do you really want to continue?", @"")] == NSAlertSecondButtonReturn) // NO
             return;
     }
+    if ([model hasResults]) {
+        if ([Dialogs askYesNo:NSLocalizedString(@"Keep the previous comparisons?", @"")] == NSAlertSecondButtonReturn) // NO
+            keep = false;
+    }
     [self setScanOptions];
-    [model doScan];
+    [model doScan:keep];
 }
 
 - (void)switchSelected

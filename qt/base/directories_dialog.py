@@ -219,9 +219,9 @@ class DirectoriesDialog(QMainWindow):
             msg = tr("You have unsaved results, do you really want to continue?")
             if not self.app.confirm(title, msg):
                 return
-        if self.app.model.results.groups:
+        if len(self.app.model.results.scanbase) > 0:
             title = tr("Start a new scan")
-            msg = tr("You have results, keep them?")
+            msg = tr("Keep the previous comparisons?")
             keep = True
             if not self.app.confirm(title, msg):
                 keep = False
