@@ -175,7 +175,7 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
             id2picture[picture.cache_id] = picture
         except ValueError:
             pass
-    scanbase_ids = {cache.get_id(fname): True for fname in scanbase}
+    scanbase_ids = {cache.get_id(fname): True for fname in scanbase if fname in cache}
     cache.close()
     pictures = [p for p in pictures if hasattr(p, 'cache_id')]
     pool = multiprocessing.Pool()
