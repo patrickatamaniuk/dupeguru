@@ -50,6 +50,7 @@ class Results(Markable):
         self.app = app
         self.problems = [] # (dupe, error_msg)
         self.is_modified = False
+        self.__scanbase = []
 
     def _did_mark(self, dupe):
         self.__marked_size += dupe.size
@@ -218,6 +219,7 @@ class Results(Markable):
             if not other_files:
                 return
             for other_file in other_files:
+                logging.debug('rematching %s' % repr(engine.get_match(ref_file, other_file)))
                 group.add_match(engine.get_match(ref_file, other_file))
             do_match(other_files[0], other_files[1:], group)
 
@@ -226,6 +228,13 @@ class Results(Markable):
             root = ET.parse(infile).getroot()
         except Exception:
             return
+
+        scanbase = []
+        for scanbase_elem in root.getiterator('scanbase'):
+            paths = list([p.attrib.get('path') for p in scanbase_elem.getiterator('file')])
+            scanbase.extend(paths)
+        self.__scanbase = scanbase
+
         group_elems = list(root.getiterator('group'))
         groups = []
         marked = set()
@@ -365,6 +374,10 @@ class Results(Markable):
                 match_elem.set('first', str(dupe2index[match.first]))
                 match_elem.set('second', str(dupe2index[match.second]))
                 match_elem.set('percentage', str(int(match.percentage)))
+        scanbase_elem = ET.SubElement(root, 'scanbase')
+        for path in self.__scanbase:
+            file_elem = ET.SubElement(scanbase_elem, 'file')
+            file_elem.set('path', path)
         tree = ET.ElementTree(root)
 
         def do_write(outfile):
@@ -415,4 +428,12 @@ class Results(Markable):
     dupes = property(__get_dupe_list)
     groups = property(__get_groups, __set_groups)
     stat_line = property(__get_stat_line)
+
+    @property
+    def scanbase(self):
+        return self.__scanbase or []
+
+    @scanbase.setter
+    def scanbase(self, files):
+        self.__scanbase = [str(picture.path) for picture in files]
 

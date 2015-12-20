@@ -73,7 +73,7 @@ class Scanner:
         self.ignore_list = IgnoreList()
         self.discarded_file_count = 0
 
-    def _getmatches(self, files, j):
+    def _getmatches(self, files, j, scanbase=None):
         if self.size_threshold:
             j = j.start_subjob([2, 8])
             for f in j.iter_with_progress(files, tr("Read size of %d/%d files")):
@@ -125,13 +125,14 @@ class Scanner:
             return True
         return len(dupe.path) > len(ref.path)
 
-    def get_dupe_groups(self, files, j=job.nulljob):
+    def get_dupe_groups(self, files, j=job.nulljob, scanbase=None):
         j = j.start_subjob([8, 2])
         for f in (f for f in files if not hasattr(f, 'is_ref')):
             f.is_ref = False
         files = remove_dupe_paths(files)
         logging.info("Getting matches. Scan type: %d", self.scan_type)
-        matches = self._getmatches(files, j)
+        logging.debug("Scanbase %s" % repr(scanbase))
+        matches = self._getmatches(files, j, scanbase)
         logging.info('Found %d matches' % len(matches))
         j.set_progress(100, tr("Removing false matches"))
         # In removing what we call here "false matches", we first want to remove, if we scan by

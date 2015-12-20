@@ -219,7 +219,13 @@ class DirectoriesDialog(QMainWindow):
             msg = tr("You have unsaved results, do you really want to continue?")
             if not self.app.confirm(title, msg):
                 return
-        self.app.model.start_scanning()
+        if self.app.model.results.groups:
+            title = tr("Start a new scan")
+            msg = tr("You have results, keep them?")
+            keep = True
+            if not self.app.confirm(title, msg):
+                keep = False
+        self.app.model.start_scanning(rescan=keep)
 
     def selectionChanged(self, selected, deselected):
         self._updateRemoveButton()

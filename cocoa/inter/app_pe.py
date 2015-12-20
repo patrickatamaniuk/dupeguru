@@ -302,14 +302,14 @@ class DupeGuruPE(DupeGuruBase):
             return None
         return ref.path
     
-    def start_scanning(self):
+    def start_scanning(self, rescan=True):
         if self.directories.has_iphoto_path():
             try:
                 app('iPhoto')
             except ApplicationNotFoundError:
                 self.view.show_message(tr("The iPhoto application couldn't be found."))
                 return
-        DupeGuruBase.start_scanning(self)
+        DupeGuruBase.start_scanning(self, rescan=rescan)
     
 class PyDupeGuru(PyDupeGuruBase):
     def __init__(self):

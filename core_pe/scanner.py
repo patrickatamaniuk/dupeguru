@@ -16,9 +16,9 @@ class ScannerPE(Scanner):
     match_scaled = False
     threshold = 75
     
-    def _getmatches(self, files, j):
+    def _getmatches(self, files, j, scanbase=None):
         if self.scan_type == ScanType.FuzzyBlock:
-            return matchblock.getmatches(files, self.cache_path, self.threshold, self.match_scaled, j)
+            return matchblock.getmatches(files, self.cache_path, self.threshold, self.match_scaled, j, scanbase)
         elif self.scan_type == ScanType.ExifTimestamp:
             return matchexif.getmatches(files, self.match_scaled, j)
         else:

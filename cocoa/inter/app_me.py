@@ -209,14 +209,14 @@ class DupeGuruME(DupeGuruBase):
             copy = True
         return DupeGuruBase.copy_or_move(self, dupe, copy, destination, dest_type)
     
-    def start_scanning(self):
+    def start_scanning(self, rescan=True):
         if self.directories.has_itunes_path():
             try:
                 app(ITUNES, terms=tunes)
             except ApplicationNotFoundError:
                 self.view.show_message(tr("The iTunes application couldn't be found."))
                 return
-        DupeGuruBase.start_scanning(self)
+        DupeGuruBase.start_scanning(self, rescan=rescan)
     
     def remove_dead_tracks(self):
         def do(j):

@@ -105,13 +105,14 @@ def get_match(first, second, percentage):
         percentage = 0
     return Match(first, second, percentage)
 
-def async_compare(ref_ids, other_ids, dbname, threshold, picinfo):
+def async_compare(ref_ids, other_ids, dbname, threshold, picinfo, scanbase):
     # The list of ids in ref_ids have to be compared to the list of ids in other_ids. other_ids
     # can be None. In this case, ref_ids has to be compared with itself
     # picinfo is a dictionary {pic_id: (dimensions, is_ref)}
     cache = Cache(dbname)
     limit = 100 - threshold
     ref_pairs = list(cache.get_multiple(ref_ids))
+
     if other_ids is not None:
         other_pairs = list(cache.get_multiple(other_ids))
         comparisons_to_do = [(r, o) for r in ref_pairs for o in other_pairs]
@@ -119,6 +120,9 @@ def async_compare(ref_ids, other_ids, dbname, threshold, picinfo):
         comparisons_to_do = list(combinations(ref_pairs, 2))
     results = []
     for (ref_id, ref_blocks), (other_id, other_blocks) in comparisons_to_do:
+        if ref_id in scanbase and other_id in scanbase:
+            #logging.debug('not comparing %s %s' % (ref_id, other_id))
+            continue
         ref_dimensions, ref_is_ref = picinfo[ref_id]
         other_dimensions, other_is_ref = picinfo[other_id]
         if ref_is_ref and other_is_ref:
@@ -130,12 +134,16 @@ def async_compare(ref_ids, other_ids, dbname, threshold, picinfo):
             percentage = 100 - diff
         except (DifferentBlockCountError, NoBlocksError):
             percentage = 0
+        logging.debug("Compared %s %s" % (ref_id, other_id))
         if percentage >= threshold:
             results.append((ref_id, other_id, percentage))
     cache.close()
     return results
 
-def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nulljob):
+def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nulljob, scanbase=None):
+    if scanbase is None:
+        scanbase = []
+
     def get_picinfo(p):
         if match_scaled:
             return (None, p.is_ref)
@@ -167,6 +175,7 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
             id2picture[picture.cache_id] = picture
         except ValueError:
             pass
+    scanbase_ids = {cache.get_id(fname): True for fname in scanbase}
     cache.close()
     pictures = [p for p in pictures if hasattr(p, 'cache_id')]
     pool = multiprocessing.Pool()
@@ -177,6 +186,7 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
     # with itself. Thus, each chunk will show up as a ref_chunk having other_chunk set to None once.
     comparisons_to_do = list(combinations(chunks + [None], 2))
     comparison_count = 0
+    logging.debug("Starting comparison job")
     j.start_job(len(comparisons_to_do))
     try:
         for ref_chunk, other_chunk in comparisons_to_do:
@@ -187,7 +197,7 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
                 picinfo.update({p.cache_id: get_picinfo(p) for p in other_chunk})
             else:
                 other_ids = None
-            args = (ref_ids, other_ids, cache_path, threshold, picinfo)
+            args = (ref_ids, other_ids, cache_path, threshold, picinfo, scanbase_ids)
             async_results.append(pool.apply_async(async_compare, args))
             collect_results()
         collect_results(collect_all=True)
@@ -200,6 +210,7 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
         logging.warning("Ran out of memory when scanning! We had %d matches.", len(matches))
         del matches[-len(matches)//3:] # some wiggle room to ensure we don't run out of memory again.
     pool.close()
+    logging.debug("Finished comparing, starting verification")
     result = []
     myiter = j.iter_with_progress(
         iterconsume(matches, reverse=False),
@@ -216,6 +227,7 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
             ref.dimensions # pre-read dimensions for display in results
             other.dimensions
             result.append(get_match(ref, other, percentage))
+    logging.debug("Finished verification")
     return result
 
 multiprocessing.freeze_support()

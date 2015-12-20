@@ -726,7 +726,7 @@ class DupeGuru(Broadcaster):
         except OSError as e:
             self.view.show_message(tr("Couldn't write to file: {}").format(str(e)))
 
-    def start_scanning(self):
+    def start_scanning(self, rescan=False):
         """Starts an async job to scan for duplicates.
 
         Scans folders selected in :attr:`directories` and put the results in :attr:`results`
@@ -739,13 +739,20 @@ class DupeGuru(Broadcaster):
                 files = list(self.directories.get_files(j))
             if self.options['ignore_hardlink_matches']:
                 files = self._remove_hardlink_dupes(files)
+            scanned = len(self.results.scanbase)
+            if scanned:
+                logging.info('Already scanned %d files' % scanned)
             logging.info('Scanning %d files' % len(files))
-            self.results.groups = self.scanner.get_dupe_groups(files, j)
+
+            self.results.groups = self.scanner.get_dupe_groups(files, j, self.results.scanbase)
+            self.results.scanbase = files
 
         if not self.directories.has_any_file():
             self.view.show_message(tr("The selected directories contain no scannable file."))
             return
-        self.results.groups = []
+        if not rescan:
+            logging.debug('Clearing result groups')
+            self.results.groups = []
         self._results_changed()
         self._start_job(JobType.Scan, do)
 

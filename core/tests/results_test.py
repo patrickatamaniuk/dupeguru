@@ -457,9 +457,9 @@ class TestCaseResultsXML:
         doc = ET.parse(f)
         root = doc.getroot()
         eq_('results', root.tag)
-        eq_(2, len(root))
+        eq_(3, len(root))
         eq_(2, len([c for c in root if c.tag == 'group']))
-        g1, g2 = root
+        g1, g2, g3 = root
         eq_(6,len(g1))
         eq_(3,len([c for c in g1 if c.tag == 'file']))
         eq_(3,len([c for c in g1 if c.tag == 'match']))
@@ -483,6 +483,7 @@ class TestCaseResultsXML:
         eq_('n',d2.get('is_ref'))
         eq_('ibabtu',d1.get('words'))
         eq_('ibabtu',d2.get('words'))
+        eq_(0, len(g3)) #expect scanbase files, not initialized by a real scan
     
     def test_LoadXML(self):
         def get_file(path):
