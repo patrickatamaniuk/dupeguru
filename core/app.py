@@ -740,14 +740,15 @@ class DupeGuru(Broadcaster):
                 files = list(self.directories.get_files(j))
             if self.options['ignore_hardlink_matches']:
                 files = self._remove_hardlink_dupes(files)
-            scanned = len(self.results.scanbase)
-            if scanned:
-                logging.info('Already scanned %d files' % scanned)
+            if self.options['incremental_scan']:
+                scanbase = self.results.scanbase
+            else:
+                scanbase = []
             logging.info('Scanning %d files' % len(files))
             if self.options['incremental_scan']:
-                self.results.groups += self.scanner.get_dupe_groups(files, j, self.results.scanbase)
+                self.results.groups += self.scanner.get_dupe_groups(files, j, scanbase)
             else:
-                self.results.groups = self.scanner.get_dupe_groups(files, j, self.results.scanbase)
+                self.results.groups = self.scanner.get_dupe_groups(files, j, scanbase)
             self.results.scanbase = files
 
         self.options['incremental_scan'] = rescan
