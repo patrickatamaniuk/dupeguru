@@ -174,6 +174,7 @@ class DupeGuru(Broadcaster):
             'clean_empty_dirs': False,
             'ignore_hardlink_matches': False,
             'copymove_dest_type': DestType.Relative,
+            'incremental_scan': False,
         }
         self.selected_dupes = []
         self.details_panel = DetailsPanel(self)
@@ -743,9 +744,13 @@ class DupeGuru(Broadcaster):
             if scanned:
                 logging.info('Already scanned %d files' % scanned)
             logging.info('Scanning %d files' % len(files))
-
-            self.results.groups = self.scanner.get_dupe_groups(files, j, self.results.scanbase)
+            if self.options['incremental_scan']:
+                self.results.groups += self.scanner.get_dupe_groups(files, j, self.results.scanbase)
+            else:
+                self.results.groups = self.scanner.get_dupe_groups(files, j, self.results.scanbase)
             self.results.scanbase = files
+
+        self.options['incremental_scan'] = rescan
 
         if not self.directories.has_any_file():
             self.view.show_message(tr("The selected directories contain no scannable file."))
@@ -753,6 +758,8 @@ class DupeGuru(Broadcaster):
         if not rescan:
             logging.debug('Clearing result groups')
             self.results.groups = []
+        else:
+            logging.debug('Keeping result groups')
         self._results_changed()
         self._start_job(JobType.Scan, do)
 
