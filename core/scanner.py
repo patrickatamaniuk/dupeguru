@@ -131,7 +131,7 @@ class Scanner:
             f.is_ref = False
         files = remove_dupe_paths(files)
         logging.info("Getting matches. Scan type: %d", self.scan_type)
-        logging.debug("Scanbase %s" % repr(scanbase))
+        #logging.debug("Scanbase %s" % repr(scanbase))
         matches = self._getmatches(files, j, scanbase)
         logging.info('Found %d matches' % len(matches))
         j.set_progress(100, tr("Removing false matches"))

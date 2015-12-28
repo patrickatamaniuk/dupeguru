@@ -16,6 +16,7 @@ from hscommon.jobprogress import job
 
 from core.engine import Match
 from .block import avgdiff, DifferentBlockCountError, NoBlocksError
+from .cacheMem import CacheMem
 from .cache import Cache
 
 # OPTIMIZATION NOTES:
@@ -68,7 +69,7 @@ def prepare_pictures(pictures, cache_path, with_dimensions, j=job.nulljob):
                 logging.warning("We have a picture with a null path here")
                 continue
             picture.unicode_path = str(picture.path)
-            logging.debug("Analyzing picture at %s", picture.unicode_path)
+            #logging.debug("Analyzing picture at %s", picture.unicode_path)
             if with_dimensions:
                 picture.dimensions # pre-read dimensions
             try:
@@ -109,20 +110,20 @@ def async_compare(ref_ids, other_ids, dbname, threshold, picinfo, scanbase):
     # The list of ids in ref_ids have to be compared to the list of ids in other_ids. other_ids
     # can be None. In this case, ref_ids has to be compared with itself
     # picinfo is a dictionary {pic_id: (dimensions, is_ref)}
-    cache = Cache(dbname)
+    logging.debug('async_compare instantiating cache')
+    cache = CacheMem(dbname)
     limit = 100 - threshold
-    ref_pairs = list(cache.get_multiple(ref_ids))
 
     if other_ids is not None:
-        other_pairs = list(cache.get_multiple(other_ids))
-        comparisons_to_do = [(r, o) for r in ref_pairs for o in other_pairs]
+        comparisons_to_do = [(r, o) for r in ref_ids for o in other_ids
+                             if not (r in scanbase and o in scanbase)]
     else:
-        comparisons_to_do = list(combinations(ref_pairs, 2))
+        comparisons_to_do = list(combinations([r for r in ref_ids if r not in scanbase], 2))
     results = []
-    for (ref_id, ref_blocks), (other_id, other_blocks) in comparisons_to_do:
-        if ref_id in scanbase and other_id in scanbase:
-            #logging.debug('not comparing %s %s' % (ref_id, other_id))
-            continue
+    logging.debug('async_compare - have %d comparisons to do' % len(comparisons_to_do))
+    for ref_id, other_id in comparisons_to_do:
+        ref_blocks = cache[ref_id]
+        other_blocks = cache[other_id]
         ref_dimensions, ref_is_ref = picinfo[ref_id]
         other_dimensions, other_is_ref = picinfo[other_id]
         if ref_is_ref and other_is_ref:
@@ -167,7 +168,11 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
     j = j.start_subjob([3, 7])
     pictures = prepare_pictures(pictures, cache_path, with_dimensions=not match_scaled, j=j)
     j = j.start_subjob([9, 1], tr("Preparing for matching"))
-    cache = Cache(cache_path)
+    logging.debug('getmatches instantiating and reloading cache')
+    cache = CacheMem(cache_path) #read-only from now on, initialize the Collective
+    if cache.using_collective: # reset cache collective
+        cache.load(cache_path)
+    logging.debug("Updating pictures cache id")
     id2picture = {}
     for picture in pictures:
         try:
@@ -176,11 +181,11 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
         except ValueError:
             pass
     scanbase_ids = {cache.get_id(fname): True for fname in scanbase if fname in cache}
-    cache.close()
     pictures = [p for p in pictures if hasattr(p, 'cache_id')]
     pool = multiprocessing.Pool()
     async_results = []
     matches = []
+    logging.debug("Calculating chunks")
     chunks = get_chunks(pictures)
     # We add a None element at the end of the chunk list because each chunk has to be compared
     # with itself. Thus, each chunk will show up as a ref_chunk having other_chunk set to None once.
