@@ -8,7 +8,7 @@
 
 import logging
 import multiprocessing
-from itertools import combinations
+from itertools import combinations, product
 
 from hscommon.util import extract, iterconsume
 from hscommon.trans import tr
@@ -69,7 +69,7 @@ def prepare_pictures(pictures, cache_path, with_dimensions, j=job.nulljob):
                 logging.warning("We have a picture with a null path here")
                 continue
             picture.unicode_path = str(picture.path)
-            #logging.debug("Analyzing picture at %s", picture.unicode_path)
+            logging.debug("Analyzing picture at %s", picture.unicode_path)
             if with_dimensions:
                 picture.dimensions # pre-read dimensions
             try:
@@ -101,6 +101,29 @@ def get_chunks(pictures):
     chunks = [pictures[i:i+chunk_size] for i in range(0, len(pictures), chunk_size)]
     return chunks
 
+def get_old_new_comparisons(old, new):
+    """Calculate comparisons_to_do for old X new pictures.
+
+        returns product of chunks to compare, ready to add to the combinations of new picture comparisons
+    """
+    if not len(old):
+        logging.info("No old-new chunks neccessary")
+        return []
+    min_chunk_count = multiprocessing.cpu_count() * 2 # have enough chunks to feed all subprocesses
+    l = len(old) + len(new)
+    chunk_count = l // DEFAULT_CHUNK_SIZE
+    chunk_count = max(min_chunk_count, chunk_count)
+    chunk_size = (l // chunk_count) + 1
+    chunk_size = max(MIN_CHUNK_SIZE, chunk_size)
+    logging.info(
+        "Creating %d old-new chunks with a chunk size of %d for %d old and %d new pictures", chunk_count,
+        chunk_size, len(old), len(new)
+    )
+
+    new_chunks = [new[i:i+chunk_size] for i in range(0, len(new), chunk_size)]
+    old_chunks = [old[i:i+chunk_size] for i in range(0, len(old), chunk_size)]
+    return product(new_chunks, old_chunks)
+
 def get_match(first, second, percentage):
     if percentage < 0:
         percentage = 0
@@ -110,13 +133,10 @@ def async_compare(ref_ids, other_ids, dbname, threshold, picinfo, scanbase):
     # The list of ids in ref_ids have to be compared to the list of ids in other_ids. other_ids
     # can be None. In this case, ref_ids has to be compared with itself
     # picinfo is a dictionary {pic_id: (dimensions, is_ref)}
-    logging.debug('async_compare instantiating cache')
     cache = CacheMem(dbname)
     limit = 100 - threshold
-
     if other_ids is not None:
-        comparisons_to_do = [(r, o) for r in ref_ids for o in other_ids
-                             if not (r in scanbase and o in scanbase)]
+        comparisons_to_do = list(product(ref_ids, other_ids))
     else:
         comparisons_to_do = list(combinations([r for r in ref_ids if r not in scanbase], 2))
     results = []
@@ -135,7 +155,6 @@ def async_compare(ref_ids, other_ids, dbname, threshold, picinfo, scanbase):
             percentage = 100 - diff
         except (DifferentBlockCountError, NoBlocksError):
             percentage = 0
-        logging.debug("Compared %s %s" % (ref_id, other_id))
         if percentage >= threshold:
             results.append((ref_id, other_id, percentage))
     cache.close()
@@ -168,11 +187,11 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
     j = j.start_subjob([3, 7])
     pictures = prepare_pictures(pictures, cache_path, with_dimensions=not match_scaled, j=j)
     j = j.start_subjob([9, 1], tr("Preparing for matching"))
-    logging.debug('getmatches instantiating and reloading cache')
+
     cache = CacheMem(cache_path) #read-only from now on, initialize the Collective
     if cache.using_collective: # reset cache collective
         cache.load(cache_path)
-    logging.debug("Updating pictures cache id")
+
     id2picture = {}
     for picture in pictures:
         try:
@@ -181,17 +200,19 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
         except ValueError:
             pass
     scanbase_ids = {cache.get_id(fname): True for fname in scanbase if fname in cache}
-    pictures = [p for p in pictures if hasattr(p, 'cache_id')]
+    new_pictures = [p for p in pictures if hasattr(p, 'cache_id') and p.cache_id not in scanbase_ids]
+    old_pictures = [p for p in pictures if hasattr(p, 'cache_id') and p.cache_id in scanbase_ids]
     pool = multiprocessing.Pool()
     async_results = []
     matches = []
-    logging.debug("Calculating chunks")
-    chunks = get_chunks(pictures)
+
+    chunks = get_chunks(new_pictures) # simple list of chunks containing a list of pictures
     # We add a None element at the end of the chunk list because each chunk has to be compared
     # with itself. Thus, each chunk will show up as a ref_chunk having other_chunk set to None once.
-    comparisons_to_do = list(combinations(chunks + [None], 2))
+    comparisons_to_do = list(combinations(chunks + [None], 2)) #list of tuples of chunks
+    comparisons_to_do += get_old_new_comparisons(old_pictures, new_pictures)
     comparison_count = 0
-    logging.debug("Starting comparison job")
+
     j.start_job(len(comparisons_to_do))
     try:
         for ref_chunk, other_chunk in comparisons_to_do:
@@ -215,7 +236,7 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
         logging.warning("Ran out of memory when scanning! We had %d matches.", len(matches))
         del matches[-len(matches)//3:] # some wiggle room to ensure we don't run out of memory again.
     pool.close()
-    logging.debug("Finished comparing, starting verification")
+
     result = []
     myiter = j.iter_with_progress(
         iterconsume(matches, reverse=False),
@@ -232,8 +253,6 @@ def getmatches(pictures, cache_path, threshold=75, match_scaled=False, j=job.nul
             ref.dimensions # pre-read dimensions for display in results
             other.dimensions
             result.append(get_match(ref, other, percentage))
-    logging.debug("Finished verification")
     return result
 
 multiprocessing.freeze_support()
-
